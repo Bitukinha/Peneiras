@@ -1,6 +1,6 @@
 import { Link, useRouterState } from "@tanstack/react-router";
 import type { ReactNode } from "react";
-import logo from "@/assets/logo.png";
+import logo from "@/assets/peneiras-icon.png";
 import { LayoutDashboard, Replace, Factory, Filter, ListChecks } from "lucide-react";
 import { ThemeToggle } from "@/components/theme-toggle";
 
