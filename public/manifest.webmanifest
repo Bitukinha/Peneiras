@@ -1,0 +1,13 @@
+{
+  "name": "Nutrimilho — Controle de Peneiras",
+  "short_name": "Peneiras",
+  "description": "Controle de trocas de peneiras dos moinhos Nutrimilho.",
+  "start_url": "/",
+  "display": "standalone",
+  "background_color": "#ffffff",
+  "theme_color": "#0f4d2e",
+  "icons": [
+    { "src": "/icon.png", "sizes": "1254x1254", "type": "image/png", "purpose": "any" },
+    { "src": "/icon.png", "sizes": "1254x1254", "type": "image/png", "purpose": "maskable" }
+  ]
+}

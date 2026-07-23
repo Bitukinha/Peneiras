@@ -72,13 +72,22 @@ export const Route = createRootRouteWithContext<{ queryClient: QueryClient }>()(
   head: () => ({
     meta: [
       { charSet: "utf-8" },
-      { name: "viewport", content: "width=device-width, initial-scale=1" },
+      {
+        name: "viewport",
+        content: "width=device-width, initial-scale=1, viewport-fit=cover",
+      },
       { title: "Nutrimilho — Controle de Peneiras" },
       { name: "description", content: "Controle de trocas de peneiras dos moinhos Nutrimilho." },
       { name: "author", content: "Novaes Tech" },
+      { name: "theme-color", content: "#0f4d2e" },
+      { name: "mobile-web-app-capable", content: "yes" },
+      { name: "apple-mobile-web-app-capable", content: "yes" },
+      { name: "apple-mobile-web-app-status-bar-style", content: "black-translucent" },
+      { name: "apple-mobile-web-app-title", content: "Peneiras" },
       { property: "og:title", content: "Nutrimilho — Controle de Peneiras" },
       { property: "og:description", content: "Controle de trocas de peneiras dos moinhos Nutrimilho." },
       { property: "og:type", content: "website" },
+      { property: "og:image", content: "/icon.png" },
       { name: "twitter:card", content: "summary" },
     ],
     links: [
@@ -86,6 +95,9 @@ export const Route = createRootRouteWithContext<{ queryClient: QueryClient }>()(
         rel: "stylesheet",
         href: appCss,
       },
+      { rel: "icon", href: "/icon.png", type: "image/png" },
+      { rel: "apple-touch-icon", href: "/icon.png" },
+      { rel: "manifest", href: "/manifest.webmanifest" },
     ],
   }),
   shellComponent: RootShell,

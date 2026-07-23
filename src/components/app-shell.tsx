@@ -78,7 +78,7 @@ export function AppShell({ children }: { children: ReactNode }) {
 
       <footer className="border-t bg-card">
         <div className="mx-auto max-w-7xl px-4 py-4 text-center text-xs text-muted-foreground sm:px-6">
-          Novaes Tech 2026
+          © 2026 Nutrimilho - (Novaes Tech) | Todos os direitos reservados
         </div>
       </footer>
     </div>
