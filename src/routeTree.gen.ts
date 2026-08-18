@@ -13,6 +13,7 @@ import { Route as TrocasRouteImport } from './routes/trocas'
 import { Route as PeneirasRouteImport } from './routes/peneiras'
 import { Route as MotivosRouteImport } from './routes/motivos'
 import { Route as MoinhosRouteImport } from './routes/moinhos'
+import { Route as DivergenciasRouteImport } from './routes/divergencias'
 import { Route as IndexRouteImport } from './routes/index'
 
 const TrocasRoute = TrocasRouteImport.update({
@@ -35,6 +36,11 @@ const MoinhosRoute = MoinhosRouteImport.update({
   path: '/moinhos',
   getParentRoute: () => rootRouteImport,
 } as any)
+const DivergenciasRoute = DivergenciasRouteImport.update({
+  id: '/divergencias',
+  path: '/divergencias',
+  getParentRoute: () => rootRouteImport,
+} as any)
 const IndexRoute = IndexRouteImport.update({
   id: '/',
   path: '/',
@@ -43,6 +49,7 @@ const IndexRoute = IndexRouteImport.update({
 
 export interface FileRoutesByFullPath {
   '/': typeof IndexRoute
+  '/divergencias': typeof DivergenciasRoute
   '/moinhos': typeof MoinhosRoute
   '/motivos': typeof MotivosRoute
   '/peneiras': typeof PeneirasRoute
@@ -50,6 +57,7 @@ export interface FileRoutesByFullPath {
 }
 export interface FileRoutesByTo {
   '/': typeof IndexRoute
+  '/divergencias': typeof DivergenciasRoute
   '/moinhos': typeof MoinhosRoute
   '/motivos': typeof MotivosRoute
   '/peneiras': typeof PeneirasRoute
@@ -58,6 +66,7 @@ export interface FileRoutesByTo {
 export interface FileRoutesById {
   __root__: typeof rootRouteImport
   '/': typeof IndexRoute
+  '/divergencias': typeof DivergenciasRoute
   '/moinhos': typeof MoinhosRoute
   '/motivos': typeof MotivosRoute
   '/peneiras': typeof PeneirasRoute
@@ -65,14 +74,23 @@ export interface FileRoutesById {
 }
 export interface FileRouteTypes {
   fileRoutesByFullPath: FileRoutesByFullPath
-  fullPaths: '/' | '/moinhos' | '/motivos' | '/peneiras' | '/trocas'
+  fullPaths:
+    '/' | '/divergencias' | '/moinhos' | '/motivos' | '/peneiras' | '/trocas'
   fileRoutesByTo: FileRoutesByTo
-  to: '/' | '/moinhos' | '/motivos' | '/peneiras' | '/trocas'
-  id: '__root__' | '/' | '/moinhos' | '/motivos' | '/peneiras' | '/trocas'
+  to: '/' | '/divergencias' | '/moinhos' | '/motivos' | '/peneiras' | '/trocas'
+  id:
+    | '__root__'
+    | '/'
+    | '/divergencias'
+    | '/moinhos'
+    | '/motivos'
+    | '/peneiras'
+    | '/trocas'
   fileRoutesById: FileRoutesById
 }
 export interface RootRouteChildren {
   IndexRoute: typeof IndexRoute
+  DivergenciasRoute: typeof DivergenciasRoute
   MoinhosRoute: typeof MoinhosRoute
   MotivosRoute: typeof MotivosRoute
   PeneirasRoute: typeof PeneirasRoute
@@ -109,6 +127,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof MoinhosRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/divergencias': {
+      id: '/divergencias'
+      path: '/divergencias'
+      fullPath: '/divergencias'
+      preLoaderRoute: typeof DivergenciasRouteImport
+      parentRoute: typeof rootRouteImport
+    }
     '/': {
       id: '/'
       path: '/'
@@ -121,6 +146,7 @@ declare module '@tanstack/react-router' {
 
 const rootRouteChildren: RootRouteChildren = {
   IndexRoute: IndexRoute,
+  DivergenciasRoute: DivergenciasRoute,
   MoinhosRoute: MoinhosRoute,
   MotivosRoute: MotivosRoute,
   PeneirasRoute: PeneirasRoute,

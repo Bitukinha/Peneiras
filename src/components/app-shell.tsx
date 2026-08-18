@@ -1,12 +1,13 @@
 import { Link, useRouterState } from "@tanstack/react-router";
 import type { ReactNode } from "react";
 import logo from "@/assets/peneiras-icon.png";
-import { LayoutDashboard, Replace, Factory, Filter, ListChecks } from "lucide-react";
+import { LayoutDashboard, Replace, Factory, Filter, ListChecks, AlertTriangle } from "lucide-react";
 import { ThemeToggle } from "@/components/theme-toggle";
 
 const nav = [
   { to: "/", label: "Dashboard", icon: LayoutDashboard },
   { to: "/trocas", label: "Trocas de Peneira", icon: Replace },
+  { to: "/divergencias", label: "Divergências", icon: AlertTriangle },
   { to: "/moinhos", label: "Moinhos", icon: Factory },
   { to: "/peneiras", label: "Peneiras", icon: Filter },
   { to: "/motivos", label: "Motivos", icon: ListChecks },
