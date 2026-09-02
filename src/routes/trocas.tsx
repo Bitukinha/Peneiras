@@ -89,15 +89,15 @@ function Page() {
           <div className="flex flex-wrap items-center gap-2">
             <Button
               variant="outline"
-              onClick={() => exportTrocasExcel({ moinhos, peneiras, motivos, trocas: items })}
-              disabled={items.length === 0}
+              onClick={() => exportTrocasExcel({ moinhos, peneiras, motivos, trocas: filtradas })}
+              disabled={filtradas.length === 0}
             >
               <FileSpreadsheet className="size-4" /> Excel
             </Button>
             <Button
               variant="outline"
-              onClick={() => exportTrocasPDF({ moinhos, peneiras, motivos, trocas: items })}
-              disabled={items.length === 0}
+              onClick={() => exportTrocasPDF({ moinhos, peneiras, motivos, trocas: filtradas })}
+              disabled={filtradas.length === 0}
             >
               <FileDown className="size-4" /> PDF
             </Button>
