@@ -14,8 +14,14 @@ import {
 import {
   Table, TableBody, TableCell, TableHead, TableHeader, TableRow,
 } from "@/components/ui/table";
+import {
+  AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription,
+  AlertDialogFooter, AlertDialogHeader, AlertDialogTitle,
+} from "@/components/ui/alert-dialog";
 import { Badge } from "@/components/ui/badge";
-import { FileDown, FileSpreadsheet, Pencil, Plus, Trash2 } from "lucide-react";
+import { AlertTriangle, FileDown, FileSpreadsheet, Pencil, Plus, Trash2 } from "lucide-react";
+import { PeriodoFilter } from "@/components/periodo-filter";
+import { formatDate, noPeriodo, periodoPadrao, type Periodo } from "@/lib/periodo";
 import {
   useCrud, useMoinhos, useMotivos, usePeneiras, useTrocas, type Troca,
 } from "@/lib/storage";
@@ -53,6 +59,8 @@ function Page() {
   const [editing, setEditing] = useState<Troca | null>(null);
   const [form, setForm] = useState<FormState>(empty());
   const [filtroMoinho, setFiltroMoinho] = useState<string>("todos");
+  const [periodo, setPeriodo] = useState<Periodo>(periodoPadrao);
+  const [confirmarAvisos, setConfirmarAvisos] = useState(false);
 
   const cadastrosOk = moinhos.length && peneiras.length && motivos.length;
 
@@ -64,21 +72,64 @@ function Page() {
     setOpen(true);
   };
 
-  const submit = () => {
-    if (!form.moinhoId || !form.peneiraEntradaId || !form.peneiraSaidaId || !form.motivoId || !form.responsavel.trim()) return;
-    if (editing) update(editing.id, form);
-    else add({ ...form, criadoEm: new Date().toISOString() });
-    setOpen(false);
-  };
-
   const nomeMoinho = (id: string) => moinhos.find((m) => m.id === id)?.nome ?? "—";
   const codPeneira = (id: string) => peneiras.find((p) => p.id === id)?.codigo ?? "—";
   const nomeMotivo = (id: string) => motivos.find((m) => m.id === id)?.nome ?? "—";
 
+  // Confere a troca do formulário contra o histórico do moinho (mesma regra da aba Divergências).
+  const avisos = useMemo(() => {
+    const out: string[] = [];
+    if (!form.moinhoId) return out;
+    if (form.peneiraEntradaId && form.peneiraEntradaId === form.peneiraSaidaId) {
+      out.push(`A peneira de entrada e a de saída são a mesma (${codPeneira(form.peneiraEntradaId)}).`);
+    }
+    const chave = (t: Pick<Troca, "data" | "horario" | "criadoEm">) => `${t.data}${t.horario}${t.criadoEm}`;
+    const minha = chave({ ...form, criadoEm: editing?.criadoEm ?? "\uffff" });
+    const doMoinho = items
+      .filter((t) => t.moinhoId === form.moinhoId && t.id !== editing?.id)
+      .sort((a, b) => chave(a).localeCompare(chave(b)));
+    const anterior = [...doMoinho].reverse().find((t) => chave(t) < minha);
+    const posterior = doMoinho.find((t) => chave(t) > minha);
+    if (anterior && form.peneiraSaidaId && anterior.peneiraEntradaId !== form.peneiraSaidaId) {
+      out.push(
+        `A peneira instalada no ${nomeMoinho(form.moinhoId)} é a ${codPeneira(anterior.peneiraEntradaId)} ` +
+        `(troca de ${formatDate(anterior.data)} ${anterior.horario}), mas a saída informada é ${codPeneira(form.peneiraSaidaId)}.`,
+      );
+    }
+    if (posterior && form.peneiraEntradaId && posterior.peneiraSaidaId !== form.peneiraEntradaId) {
+      out.push(
+        `A troca seguinte (${formatDate(posterior.data)} ${posterior.horario}) registra a saída da peneira ` +
+        `${codPeneira(posterior.peneiraSaidaId)}, mas a entrada informada aqui é ${codPeneira(form.peneiraEntradaId)}.`,
+      );
+    }
+    return out;
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [form, items, editing, peneiras, moinhos]);
+
+  const salvar = () => {
+    if (editing) update(editing.id, form);
+    else add({ ...form, criadoEm: new Date().toISOString() });
+    setConfirmarAvisos(false);
+    setOpen(false);
+  };
+
+  const submit = () => {
+    if (!form.moinhoId || !form.peneiraEntradaId || !form.peneiraSaidaId || !form.motivoId || !form.responsavel.trim()) return;
+    // Não bloqueia: só pede confirmação quando há algo estranho.
+    if (avisos.length > 0) setConfirmarAvisos(true);
+    else salvar();
+  };
+
   const filtradas = useMemo(() => {
-    const arr = filtroMoinho === "todos" ? items : items.filter((t) => t.moinhoId === filtroMoinho);
+    const arr = items.filter(
+      (t) => (filtroMoinho === "todos" || t.moinhoId === filtroMoinho) && noPeriodo(t.data, periodo),
+    );
     return [...arr].sort((a, b) => (b.data + b.horario).localeCompare(a.data + a.horario));
-  }, [items, filtroMoinho]);
+  }, [items, filtroMoinho, periodo]);
+
+  const exportCtx = () => ({
+    moinhos, peneiras, motivos, trocas: filtradas, filtros: { periodo, moinhoId: filtroMoinho },
+  });
 
   return (
     <AppShell>
@@ -89,14 +140,14 @@ function Page() {
           <div className="flex flex-wrap items-center gap-2">
             <Button
               variant="outline"
-              onClick={() => exportTrocasExcel({ moinhos, peneiras, motivos, trocas: filtradas })}
+              onClick={() => exportTrocasExcel(exportCtx())}
               disabled={filtradas.length === 0}
             >
               <FileSpreadsheet className="size-4" /> Excel
             </Button>
             <Button
               variant="outline"
-              onClick={() => exportTrocasPDF({ moinhos, peneiras, motivos, trocas: filtradas })}
+              onClick={() => exportTrocasPDF(exportCtx())}
               disabled={filtradas.length === 0}
             >
               <FileDown className="size-4" /> PDF
@@ -168,12 +219,43 @@ function Page() {
                   />
                 </Field>
               </div>
+              {avisos.length > 0 && (
+                <div className="rounded-md border border-amber-500/40 bg-amber-500/10 p-3 text-sm text-amber-800 dark:text-amber-300">
+                  <div className="mb-1 flex items-center gap-1.5 font-medium">
+                    <AlertTriangle className="size-4" /> Atenção: confira as peneiras
+                  </div>
+                  <ul className="list-disc space-y-0.5 pl-5">
+                    {avisos.map((a) => <li key={a}>{a}</li>)}
+                  </ul>
+                </div>
+              )}
               <DialogFooter>
                 <Button variant="outline" onClick={() => setOpen(false)}>Cancelar</Button>
                 <Button onClick={submit}>{editing ? "Salvar" : "Registrar troca"}</Button>
               </DialogFooter>
             </DialogContent>
           </Dialog>
+          <AlertDialog open={confirmarAvisos} onOpenChange={setConfirmarAvisos}>
+            <AlertDialogContent>
+              <AlertDialogHeader>
+                <AlertDialogTitle className="flex items-center gap-2">
+                  <AlertTriangle className="size-5 text-amber-500" /> Peneira possivelmente errada
+                </AlertDialogTitle>
+                <AlertDialogDescription asChild>
+                  <div className="space-y-2 text-sm">
+                    <ul className="list-disc space-y-1 pl-5">
+                      {avisos.map((a) => <li key={a}>{a}</li>)}
+                    </ul>
+                    <p className="font-medium text-foreground">Tem certeza que deseja salvar mesmo assim?</p>
+                  </div>
+                </AlertDialogDescription>
+              </AlertDialogHeader>
+              <AlertDialogFooter>
+                <AlertDialogCancel>Voltar e corrigir</AlertDialogCancel>
+                <AlertDialogAction onClick={salvar}>Sim, salvar mesmo assim</AlertDialogAction>
+              </AlertDialogFooter>
+            </AlertDialogContent>
+          </AlertDialog>
           </div>
         }
       />
@@ -187,8 +269,10 @@ function Page() {
         </Card>
       )}
 
-      <div className="mb-4 flex flex-wrap items-center gap-3">
-        <Label className="text-sm text-muted-foreground">Filtrar por moinho:</Label>
+      <div className="mb-4 flex flex-wrap items-center gap-x-6 gap-y-3">
+        <PeriodoFilter value={periodo} onChange={setPeriodo} />
+        <div className="flex flex-wrap items-center gap-3">
+        <Label className="text-sm text-muted-foreground">Moinho:</Label>
         <Select value={filtroMoinho} onValueChange={setFiltroMoinho}>
           <SelectTrigger className="w-[220px]"><SelectValue /></SelectTrigger>
           <SelectContent>
@@ -196,6 +280,10 @@ function Page() {
             {moinhos.map((m) => <SelectItem key={m.id} value={m.id}>{m.nome}</SelectItem>)}
           </SelectContent>
         </Select>
+        </div>
+        <span className="text-sm text-muted-foreground sm:ml-auto">
+          {filtradas.length} {filtradas.length === 1 ? "troca" : "trocas"}
+        </span>
       </div>
 
       <Card className="overflow-hidden">
@@ -218,7 +306,7 @@ function Page() {
               {filtradas.length === 0 ? (
                 <TableRow>
                   <TableCell colSpan={9} className="py-10 text-center text-sm text-muted-foreground">
-                    Nenhuma troca registrada.
+                    Nenhuma troca registrada no período.
                   </TableCell>
                 </TableRow>
               ) : (
@@ -265,10 +353,4 @@ function Field({ label, children }: { label: string; children: React.ReactNode }
       {children}
     </div>
   );
-}
-
-function formatDate(iso: string) {
-  if (!iso) return "—";
-  const [y, m, d] = iso.split("-");
-  return `${d}/${m}/${y}`;
 }

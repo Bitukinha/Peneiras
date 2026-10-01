@@ -12,6 +12,8 @@ import {
 import { Badge } from "@/components/ui/badge";
 import { AlertTriangle, ArrowRight, CheckCircle2 } from "lucide-react";
 import { useMoinhos, usePeneiras, useTrocas, type Troca } from "@/lib/storage";
+import { PeriodoFilter } from "@/components/periodo-filter";
+import { formatDate, noPeriodo, periodoPadrao, type Periodo } from "@/lib/periodo";
 
 export const Route = createFileRoute("/divergencias")({
   head: () => ({ meta: [{ title: "Divergências — Nutrimilho" }] }),
@@ -34,6 +36,7 @@ function Page() {
   const [peneiras] = usePeneiras();
   const [trocas] = useTrocas();
   const [filtroMoinho, setFiltroMoinho] = useState<string>("todos");
+  const [periodo, setPeriodo] = useState<Periodo>(periodoPadrao);
 
   const nomeMoinho = (id: string) => moinhos.find((m) => m.id === id)?.nome ?? "—";
   const codPeneira = (id: string) => peneiras.find((p) => p.id === id)?.codigo ?? "—";
@@ -59,9 +62,12 @@ function Page() {
     return out.sort((a, b) => chave(b.atual).localeCompare(chave(a.atual)));
   }, [trocas]);
 
+  // A sequência é calculada sobre todo o histórico; o período só filtra o que é exibido.
   const filtradas = useMemo(
-    () => (filtroMoinho === "todos" ? divergencias : divergencias.filter((d) => d.moinhoId === filtroMoinho)),
-    [divergencias, filtroMoinho],
+    () => divergencias.filter(
+      (d) => (filtroMoinho === "todos" || d.moinhoId === filtroMoinho) && noPeriodo(d.atual.data, periodo),
+    ),
+    [divergencias, filtroMoinho, periodo],
   );
 
   return (
@@ -71,8 +77,10 @@ function Page() {
         description="Trocas em que a peneira de saída não corresponde à peneira que ficou instalada na troca anterior do mesmo moinho."
       />
 
-      <div className="mb-4 flex flex-wrap items-center gap-3">
-        <Label className="text-sm text-muted-foreground">Filtrar por moinho:</Label>
+      <div className="mb-4 flex flex-wrap items-center gap-x-6 gap-y-3">
+        <PeriodoFilter value={periodo} onChange={setPeriodo} />
+        <div className="flex flex-wrap items-center gap-3">
+        <Label className="text-sm text-muted-foreground">Moinho:</Label>
         <Select value={filtroMoinho} onValueChange={setFiltroMoinho}>
           <SelectTrigger className="w-[220px]"><SelectValue /></SelectTrigger>
           <SelectContent>
@@ -80,6 +88,10 @@ function Page() {
             {moinhos.map((m) => <SelectItem key={m.id} value={m.id}>{m.nome}</SelectItem>)}
           </SelectContent>
         </Select>
+        </div>
+        <span className="text-sm text-muted-foreground sm:ml-auto">
+          {filtradas.length} {filtradas.length === 1 ? "divergência" : "divergências"}
+        </span>
       </div>
 
       <Card className="overflow-hidden">
@@ -101,7 +113,7 @@ function Page() {
                   <TableCell colSpan={6} className="py-10 text-center text-sm text-muted-foreground">
                     <div className="flex flex-col items-center gap-2">
                       <CheckCircle2 className="size-6 text-primary" />
-                      Nenhuma divergência encontrada.
+                      Nenhuma divergência encontrada no período.
                     </div>
                   </TableCell>
                 </TableRow>
@@ -137,10 +149,4 @@ function Page() {
       </Card>
     </AppShell>
   );
-}
-
-function formatDate(iso: string) {
-  if (!iso) return "—";
-  const [y, m, d] = iso.split("-");
-  return `${d}/${m}/${y}`;
 }

@@ -1,10 +1,12 @@
 import { createFileRoute, Link } from "@tanstack/react-router";
-import { useMemo } from "react";
+import { useMemo, useState } from "react";
 import { AppShell, PageHeader } from "@/components/app-shell";
 import { Card } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { useMoinhos, useMotivos, usePeneiras, useTrocas } from "@/lib/storage";
+import { PeriodoFilter } from "@/components/periodo-filter";
+import { hojeIso, isoLocal, noPeriodo, periodoLabel, periodoPadrao, type Periodo } from "@/lib/periodo";
 import { Factory, Filter, ListChecks, Replace, ArrowRight } from "lucide-react";
 import {
   BarChart, Bar, XAxis, YAxis, ResponsiveContainer, Tooltip, PieChart, Pie, Cell, Legend,
@@ -26,25 +28,46 @@ function Dashboard() {
   const [moinhos] = useMoinhos();
   const [peneiras] = usePeneiras();
   const [motivos] = useMotivos();
-  const [trocas] = useTrocas();
+  const [todasTrocas] = useTrocas();
+  const [periodo, setPeriodo] = useState<Periodo>(periodoPadrao);
 
-  const hoje = new Date().toISOString().slice(0, 10);
-  const trocasHoje = trocas.filter((t) => t.data === hoje).length;
+  const hoje = hojeIso();
+  const trocasHoje = todasTrocas.filter((t) => t.data === hoje).length;
 
-  const ultimos7 = useMemo(() => {
-    const dias: { dia: string; label: string; total: number }[] = [];
-    for (let i = 6; i >= 0; i--) {
-      const d = new Date();
-      d.setDate(d.getDate() - i);
-      const iso = d.toISOString().slice(0, 10);
-      dias.push({
-        dia: iso,
-        label: d.toLocaleDateString("pt-BR", { day: "2-digit", month: "2-digit" }),
-        total: trocas.filter((t) => t.data === iso).length,
+  // Todos os indicadores abaixo consideram apenas o período selecionado.
+  const trocas = useMemo(() => todasTrocas.filter((t) => noPeriodo(t.data, periodo)), [todasTrocas, periodo]);
+
+  const serie = useMemo(() => {
+    const datas = trocas.map((t) => t.data).sort();
+    const de = periodo.de || datas[0];
+    const ate = periodo.ate || datas[datas.length - 1];
+    if (!de || !ate) return { porMes: false, dados: [] as { label: string; total: number }[] };
+    const ini = new Date(`${de}T00:00:00`);
+    const fim = new Date(`${ate}T00:00:00`);
+    const dias = Math.round((fim.getTime() - ini.getTime()) / 86_400_000) + 1;
+
+    if (dias <= 62) {
+      const dados: { label: string; total: number }[] = [];
+      for (let d = new Date(ini); d <= fim; d.setDate(d.getDate() + 1)) {
+        const iso = isoLocal(d);
+        dados.push({
+          label: d.toLocaleDateString("pt-BR", { day: "2-digit", month: "2-digit" }),
+          total: trocas.filter((t) => t.data === iso).length,
+        });
+      }
+      return { porMes: false, dados };
+    }
+
+    const dados: { label: string; total: number }[] = [];
+    for (let d = new Date(ini.getFullYear(), ini.getMonth(), 1); d <= fim; d.setMonth(d.getMonth() + 1)) {
+      const ym = isoLocal(d).slice(0, 7);
+      dados.push({
+        label: d.toLocaleDateString("pt-BR", { month: "short", year: "2-digit" }),
+        total: trocas.filter((t) => t.data.startsWith(ym)).length,
       });
     }
-    return dias;
-  }, [trocas]);
+    return { porMes: true, dados };
+  }, [trocas, periodo]);
 
   const porMoinho = useMemo(() => {
     return moinhos
@@ -86,8 +109,12 @@ function Dashboard() {
         }
       />
 
+      <div className="mb-4">
+        <PeriodoFilter value={periodo} onChange={setPeriodo} />
+      </div>
+
       <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
-        <Stat label="Trocas no total" value={trocas.length} icon={<Replace className="size-5" />} />
+        <Stat label="Trocas no período" value={trocas.length} icon={<Replace className="size-5" />} />
         <Stat label="Trocas hoje" value={trocasHoje} icon={<Replace className="size-5" />} accent />
         <Stat label="Moinhos cadastrados" value={moinhos.length} icon={<Factory className="size-5" />} />
         <Stat label="Peneiras cadastradas" value={peneiras.length} icon={<Filter className="size-5" />} />
@@ -95,13 +122,16 @@ function Dashboard() {
 
       <div className="mt-6 grid gap-4 lg:grid-cols-3">
         <Card className="p-5 lg:col-span-2">
-          <h3 className="mb-4 text-sm font-semibold text-foreground">Trocas nos últimos 7 dias</h3>
+          <h3 className="mb-4 text-sm font-semibold text-foreground">
+            Trocas por {serie.porMes ? "mês" : "dia"}{" "}
+            <span className="font-normal text-muted-foreground">· {periodoLabel(periodo)}</span>
+          </h3>
           {trocas.length === 0 ? (
-            <Empty />
+            <Empty hint="Nenhuma troca no período." />
           ) : (
             <div className="h-64">
               <ResponsiveContainer width="100%" height="100%">
-                <BarChart data={ultimos7}>
+                <BarChart data={serie.dados}>
                   <XAxis dataKey="label" tickLine={false} axisLine={false} fontSize={12} />
                   <YAxis allowDecimals={false} tickLine={false} axisLine={false} fontSize={12} />
                   <Tooltip cursor={{ fill: "var(--accent)" }} />

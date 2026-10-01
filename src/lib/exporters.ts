@@ -3,14 +3,37 @@ import { jsPDF } from "jspdf";
 import autoTable from "jspdf-autotable";
 import logo from "@/assets/logo.png";
 import type { Moinho, Motivo, Peneira, Troca } from "./storage";
+import { formatDate, periodoLabel, periodoSlug, type Periodo } from "./periodo";
 
-function formatDate(iso: string) {
-  if (!iso) return "—";
-  const [y, m, d] = iso.split("-");
-  return `${d}/${m}/${y}`;
+type Ctx = {
+  moinhos: Moinho[];
+  peneiras: Peneira[];
+  motivos: Motivo[];
+  trocas: Troca[];
+  /** Filtros aplicados na tela, exibidos no relatório. */
+  filtros: { periodo: Periodo; moinhoId: string };
+};
+
+function nomeMoinhoFiltro(ctx: Ctx) {
+  return ctx.filtros.moinhoId === "todos"
+    ? "Todos os moinhos"
+    : ctx.moinhos.find((m) => m.id === ctx.filtros.moinhoId)?.nome ?? "—";
 }
 
-type Ctx = { moinhos: Moinho[]; peneiras: Peneira[]; motivos: Motivo[]; trocas: Troca[] };
+function resumoPorMotivo(ctx: Ctx) {
+  return ctx.motivos
+    .map((m) => ({ nome: m.nome, total: ctx.trocas.filter((t) => t.motivoId === m.id).length }))
+    .filter((m) => m.total > 0)
+    .sort((a, b) => b.total - a.total);
+}
+
+function nomeArquivo(ctx: Ctx, ext: string) {
+  const moinho = ctx.filtros.moinhoId === "todos"
+    ? ""
+    : "-" + nomeMoinhoFiltro(ctx)
+      .normalize("NFD").replace(/[̀-ͯ]/g, "").replace(/[^a-zA-Z0-9]+/g, "-").toLowerCase();
+  return `nutrimilho-trocas-${periodoSlug(ctx.filtros.periodo)}${moinho}.${ext}`;
+}
 
 function buildRows({ moinhos, peneiras, motivos, trocas }: Ctx) {
   const nm = (id: string) => moinhos.find((m) => m.id === id)?.nome ?? "—";
@@ -43,6 +66,8 @@ export function exportTrocasExcel(ctx: Ctx) {
   const resumo = [
     ["Relatório de Trocas de Peneira — Nutrimilho"],
     ["Gerado em", new Date().toLocaleString("pt-BR")],
+    ["Período", periodoLabel(ctx.filtros.periodo)],
+    ["Moinho", nomeMoinhoFiltro(ctx)],
     [],
     ["Total de trocas", ctx.trocas.length],
     ["Moinhos cadastrados", ctx.moinhos.length],
@@ -53,13 +78,15 @@ export function exportTrocasExcel(ctx: Ctx) {
     ["Turno A", ctx.trocas.filter((t) => t.turno === "A").length],
     ["Turno B", ctx.trocas.filter((t) => t.turno === "B").length],
     ["Turno C", ctx.trocas.filter((t) => t.turno === "C").length],
+    [],
+    ["Por motivo", "Total"],
+    ...resumoPorMotivo(ctx).map((m) => [m.nome, m.total]),
   ];
   const wsR = XLSX.utils.aoa_to_sheet(resumo);
   wsR["!cols"] = [{ wch: 30 }, { wch: 22 }];
   XLSX.utils.book_append_sheet(wb, wsR, "Resumo");
 
-  const stamp = new Date().toISOString().slice(0, 10);
-  XLSX.writeFile(wb, `nutrimilho-trocas-${stamp}.xlsx`);
+  XLSX.writeFile(wb, nomeArquivo(ctx, "xlsx"));
 }
 
 async function loadLogoDataUrl(): Promise<string | null> {
@@ -108,8 +135,13 @@ export async function exportTrocasPDF(ctx: Ctx) {
   doc.setFont("helvetica", "normal");
   doc.setFontSize(10);
   doc.text(
+    `Período: ${periodoLabel(ctx.filtros.periodo)}  ·  ${nomeMoinhoFiltro(ctx)}`,
+    pageW - 28, 48, { align: "right" },
+  );
+  doc.setFontSize(8);
+  doc.text(
     `Gerado em ${new Date().toLocaleString("pt-BR")}`,
-    pageW - 28, 50, { align: "right" },
+    pageW - 28, 61, { align: "right" },
   );
 
   // Summary cards
@@ -173,6 +205,21 @@ export async function exportTrocasPDF(ctx: Ctx) {
     doc.text("Nenhuma troca registrada no período.", pageW / 2, cardsY + 110, { align: "center" });
   }
 
-  const stamp = new Date().toISOString().slice(0, 10);
-  doc.save(`nutrimilho-trocas-${stamp}.pdf`);
+  const porMotivo = resumoPorMotivo(ctx);
+  if (porMotivo.length > 0) {
+    autoTable(doc, {
+      head: [["Resumo por motivo", "Trocas", "%"]],
+      body: porMotivo.map((m) => [
+        m.nome, String(m.total), `${((m.total / ctx.trocas.length) * 100).toFixed(1)}%`,
+      ]),
+      styles: { font: "helvetica", fontSize: 9, cellPadding: 5, textColor: dark, lineColor: [225, 225, 215] },
+      headStyles: { fillColor: green, textColor: [255, 255, 255], fontStyle: "bold" },
+      alternateRowStyles: { fillColor: [248, 248, 244] },
+      columnStyles: { 1: { halign: "right", cellWidth: 60 }, 2: { halign: "right", cellWidth: 60 } },
+      tableWidth: 320,
+      margin: { left: 28, right: 28, bottom: 40 },
+    });
+  }
+
+  doc.save(nomeArquivo(ctx, "pdf"));
 }
